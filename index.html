@@ -1,61 +1,173 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M Store</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PW-MARCO</title>
+  <meta name="description" content="Free Live Classes, Recorded Lectures, DPP, Notes & Test Series — PW-MARCO App" />
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
 
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #000;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-        }
+    /* ── IFRAME (main app) ── */
+    #appFrame{
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      border:none;display:block;
+    }
 
-        iframe {
-            width: 100%;
-            height: 100dvh;
-            border: none;
-        }
+    /* ── SPLASH shown while loading ── */
+    #splash{
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      z-index:9999;transition:opacity 0.5s ease;
+    }
+    #splash .logo{
+      font-size:38px;font-weight:900;letter-spacing:2px;
+      background:linear-gradient(90deg,#43e97b,#38f9d7);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      margin-bottom:8px;
+    }
+    #splash .sub{font-size:13px;color:rgba(255,255,255,0.4);margin-bottom:40px;}
+    #splash .spinner{
+      width:36px;height:36px;border:3px solid rgba(255,255,255,0.1);
+      border-top-color:#43e97b;border-radius:50%;
+      animation:spin 0.8s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg);}}
 
-        /* Loading Screen */
-        #loader {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: black;
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 20px;
-            z-index: 9999;
-        }
-    </style>
+    /* ── DOWNLOAD BANNER (shown when batch link opened, app not ready) ── */
+    #downloadBanner{
+      position:fixed;bottom:0;left:0;width:100%;
+      background:linear-gradient(160deg,#0f2027,#203a43);
+      border-top:1px solid rgba(67,233,123,0.3);
+      padding:16px 18px 28px;
+      transform:translateY(100%);
+      transition:transform 0.4s ease;
+      z-index:99999;
+    }
+    #downloadBanner.show{transform:translateY(0);}
+    #downloadBanner .dtitle{
+      font-size:15px;font-weight:800;color:white;margin-bottom:4px;
+    }
+    #downloadBanner .dsub{font-size:12px;color:#a0d9ff;margin-bottom:14px;}
+    #downloadBanner .dbtn{
+      display:block;width:100%;padding:13px;
+      background:linear-gradient(90deg,#43e97b,#38f9d7);
+      border:none;border-radius:14px;
+      color:#0a0a0a;font-weight:800;font-size:15px;
+      cursor:pointer;text-align:center;text-decoration:none;
+      margin-bottom:10px;
+    }
+    #downloadBanner .dclose{
+      display:block;width:100%;padding:10px;
+      background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);
+      border-radius:12px;color:rgba(255,255,255,0.6);
+      font-size:13px;cursor:pointer;text-align:center;
+    }
+  </style>
 </head>
-
 <body>
 
-<div id="loader">Loading M Store...</div>
+<!-- Splash screen -->
+<div id="splash">
+  <div class="logo">PW-MARCO</div>
+  <div class="sub">Free Education. No Compromise.</div>
+  <div class="spinner"></div>
+</div>
 
-<iframe 
-    src="https://app-b0kgvq6ccmbl.appmedo.com/" 
-    allowfullscreen
-    sandbox="allow-same-origin allow-scripts allow-forms allow-downloads allow-popups"
-    referrerpolicy="no-referrer">
-</iframe>
+<!-- Main app iframe -->
+<iframe
+  id="appFrame"
+  src="about:blank"
+  allow="camera; microphone; fullscreen; clipboard-read; clipboard-write"
+  allowfullscreen
+></iframe>
+
+<!-- Download banner (shows when batch deep link detected) -->
+<div id="downloadBanner">
+  <div class="dtitle">📚 Batch Found on PW-MARCO</div>
+  <div class="dsub">Open the app to access this batch for FREE</div>
+  <a id="openAppBtn" class="dbtn" href="#">Open / Download PW-MARCO App</a>
+  <button class="dclose" onclick="document.getElementById('downloadBanner').classList.remove('show')">
+    Continue to App
+  </button>
+</div>
 
 <script>
-    // Hide loader after load
-    const iframe = document.querySelector("iframe");
-    iframe.onload = () => {
-        document.getElementById("loader").style.display = "none";
-    };
-</script>
+(function(){
 
+  var BASE_APP   = 'https://app-b0kgvq6ccmbl.appmedo.com';
+  var DOWNLOAD   = 'https://m-store-chi.vercel.app';   // same site = download page if needed
+  var splash     = document.getElementById('splash');
+  var frame      = document.getElementById('appFrame');
+  var banner     = document.getElementById('downloadBanner');
+  var openBtn    = document.getElementById('openAppBtn');
+
+  /* ── 1. Read deep link param ── */
+  var params   = new URLSearchParams(window.location.search);
+  var batchId  = params.get('pwmarco-batch');   // e.g. 699bfeac73d8826cfa3bda20
+
+  /* ── 2. Build iframe URL ── */
+  var appUrl = BASE_APP;
+  if(batchId){
+    /* Navigate directly to batch inside the PW webapp */
+    appUrl = BASE_APP + '/study/batches/' + batchId;
+  }
+
+  /* ── 3. Load the app ── */
+  frame.src = appUrl;
+
+  /* ── 4. Hide splash after iframe loads (max 6s) ── */
+  var splashGone = false;
+  function hideSplash(){
+    if(splashGone) return;
+    splashGone = true;
+    splash.style.opacity = '0';
+    setTimeout(function(){ splash.style.display='none'; }, 500);
+  }
+  frame.onload = function(){ setTimeout(hideSplash, 400); };
+  setTimeout(hideSplash, 6000);
+
+  /* ── 5. If batch deep link, show download banner briefly ── */
+  if(batchId){
+    /* Give iframe 1.5s to try loading; if still here show banner */
+    setTimeout(function(){
+      if(splashGone){
+        /* App loaded fine — show soft banner so user knows which batch */
+        banner.querySelector('.dtitle').textContent = '📚 Opening your batch...';
+        banner.querySelector('.dsub').textContent   = 'Batch is loading in the app below';
+        openBtn.textContent = 'Tap here if batch did not open';
+        openBtn.href = DOWNLOAD;
+      } else {
+        /* Still loading — show download option */
+        banner.querySelector('.dtitle').textContent = '📚 Batch Found on PW-MARCO';
+        banner.querySelector('.dsub').textContent   = 'Open the app to access this batch for FREE';
+        openBtn.href = DOWNLOAD;
+      }
+      banner.classList.add('show');
+      /* Auto hide after 5s */
+      setTimeout(function(){ banner.classList.remove('show'); }, 5000);
+    }, 1500);
+  }
+
+  /* ── 6. Listen for messages from iframe (if PW app posts navigation events) ── */
+  window.addEventListener('message', function(e){
+    /* If iframe tells us it's ready, hide splash */
+    if(e.data && (e.data.type === 'ready' || e.data === 'ready')){
+      hideSplash();
+    }
+  });
+
+  /* ── 7. Handle browser back/forward for SPA ── */
+  window.addEventListener('popstate', function(){
+    var p2     = new URLSearchParams(window.location.search);
+    var bid2   = p2.get('pwmarco-batch');
+    var newUrl = bid2 ? BASE_APP+'/study/batches/'+bid2 : BASE_APP;
+    if(frame.src !== newUrl) frame.src = newUrl;
+  });
+
+})();
+</script>
 </body>
 </html>
